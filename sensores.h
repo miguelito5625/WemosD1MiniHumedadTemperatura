@@ -1,0 +1,4 @@
+
+
+void inicializarSensores();
+void loopSensores();
