@@ -40,11 +40,33 @@ void loopSensores()
 
 void controlHumedadSuelo()
 {
-  humedadSuelo = 10;
+
+
+  // humedadSuelo = 10;
+  humedadSuelo = analogRead(A0);
+
+  String mensaje = "";
+
+  if (humedadSuelo >= 1000)
+  {
+    mensaje = "sensor desconectado o fuera del suelo";
+  }else if (humedadSuelo < 1000 && humedadSuelo >= 600)
+  {
+    mensaje = "El suelo esta seco";
+  }else if (humedadSuelo < 600 && humedadSuelo >= 370)
+  {
+    mensaje = "El suelo esta humedo";
+  }else if (humedadSuelo < 370)
+  {
+    mensaje = "El sensor esta practicamente en agua";
+  }
+  
+  
   tiempo2 = millis();
   if (tiempo2 > (tiempo1 + difTiempo))
   {                     //Si ha pasado 2 segundo ejecuta el IF
     tiempo1 = millis(); //Actualiza el tiempo actual
+    Serial.println(mensaje);
     Serial.println("Enviando humedad suelo: " + (String) humedadSuelo);
     publicarMqtt("proyecto/desTel/HS/data", (String) humedadSuelo);
   }
