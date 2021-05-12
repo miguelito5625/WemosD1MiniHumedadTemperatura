@@ -3,4 +3,4 @@
 void inicializarMqttClient();
 void reconnect();
 void loopClientMqtt();
-void publicarMqtt(char* topic, String mensaje);
+void publicarMqtt(String topic, String mensaje);

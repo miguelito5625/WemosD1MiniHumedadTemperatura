@@ -3,6 +3,11 @@
 #include <PubSubClient.h>
 #include <EEPROM.h>
 
+#define reconnectButton D1
+boolean presionoReconnectButton = false;
+
+
+
 // void callback(char *topic, byte *payload, unsigned int length1);
 
 void callback(char *topic, byte *payload, unsigned int length1)
@@ -21,8 +26,9 @@ void callback(char *topic, byte *payload, unsigned int length1)
 
 }
 
-char mqtt_server[40] = "XXXX";
-char mqtt_topic[80] = "XXXX";
+char mqtt_server[50] = "XXXX";
+char mqtt_topic[50] = "XXXX";
+char mqtt_device[50] = "XXXX";
 char mqtt_client_id[30] = "";
 
 WiFiClient espclient;
@@ -45,20 +51,20 @@ bool shouldSaveConfig = false;
 
 void tick()
 {
-    //toggle state
-    digitalWrite(LED, !digitalRead(LED)); // set pin to the opposite state
+  //toggle state
+  digitalWrite(LED, !digitalRead(LED)); // set pin to the opposite state
 }
 
 //gets called when WiFiManager enters configuration mode
 void configModeCallback(WiFiManager *myWiFiManager)
 {
-    shouldSaveConfig = true;
-    Serial.println("Entered config mode");
-    Serial.println(WiFi.softAPIP());
-    //if you used auto generated SSID, print it
-    Serial.println(myWiFiManager->getConfigPortalSSID());
-    //entered config mode, make led toggle faster
-    ticker.attach(0.2, tick);
+  shouldSaveConfig = true;
+  Serial.println("Entered config mode");
+  Serial.println(WiFi.softAPIP());
+  //if you used auto generated SSID, print it
+  Serial.println(myWiFiManager->getConfigPortalSSID());
+  //entered config mode, make led toggle faster
+  ticker.attach(0.2, tick);
 }
 
 void reconnect()
@@ -129,19 +135,38 @@ String generarId(int tamanio) {
   return id;
 }
 
+void conectarWifi() {
+  int reconnectButtonVal = digitalRead(reconnectButton);
+  if (!presionoReconnectButton && reconnectButtonVal == LOW) {
+    presionoReconnectButton = true;
+  }
+  if (presionoReconnectButton && reconnectButtonVal == HIGH) {
+    presionoReconnectButton = false;
+    WiFiManager wifiManager;
+    wifiManager.startConfigPortal("OnDemandAP");
+    Serial.println("connected...yeey :)");
+
+  }
+}
+
 void inicializarMqttClient()
 {
-    Serial.begin(115200);
-    EEPROM.begin(512);
-    WiFi.mode(WIFI_STA);
-    //set led pin as output
-    pinMode(LED, OUTPUT);
-     // start ticker with 0.5 because we start in AP mode and try to connect
+  Serial.begin(115200);
+  EEPROM.begin(512);
+
+  pinMode(reconnectButton, INPUT_PULLUP);
+
+
+  WiFi.mode(WIFI_STA);
+  //set led pin as output
+  pinMode(LED, OUTPUT);
+  // start ticker with 0.5 because we start in AP mode and try to connect
   ticker.attach(0.6, tick);
 
   // id/name, placeholder/prompt, default, length
-  WiFiManagerParameter custom_mqtt_server("server", "Mqtt Server", mqtt_server, 40);
-  WiFiManagerParameter custom_mqtt_topic("topic", "Mqtt topic", mqtt_server, 80);
+  WiFiManagerParameter custom_mqtt_server("server", "Mqtt Server", mqtt_server, 50);
+  WiFiManagerParameter custom_mqtt_topic("topic", "Mqtt topic", mqtt_topic, 50);
+  WiFiManagerParameter custom_mqtt_device("device", "Mqtt device", mqtt_device, 50);
 
   //WiFiManager
   WiFiManager wm;
@@ -149,24 +174,26 @@ void inicializarMqttClient()
   wm.setAPCallback(configModeCallback);
   wm.addParameter(&custom_mqtt_server);
   wm.addParameter(&custom_mqtt_topic);
+  wm.addParameter(&custom_mqtt_device);
 
-  //fetches ssid and pass and tries to connect
-  //if it does not connect it starts an access point with the specified name
-  //here  "AutoConnectAP"
-  //and goes into a blocking loop awaiting configuration
-  if (!wm.autoConnect())
-  {
-    Serial.println("failed to connect and hit timeout");
-    //reset and try again, or maybe put it to deep sleep
-    ESP.restart();
-    delay(1000);
-  }
+  //Funcion para buscar otro wifi sino encuentra el que esta registrado
+  //No usar junto a startConfigPortal()
+
+    if (!wm.autoConnect())
+    {
+      Serial.println("failed to connect and hit timeout");
+      //reset and try again, or maybe put it to deep sleep
+      ESP.restart();
+      delay(1000);
+    }
+
 
   //if you get here you have connected to the WiFi
   Serial.println("connected...yeey :)");
 
   strcpy(mqtt_server, custom_mqtt_server.getValue());
   strcpy(mqtt_topic, custom_mqtt_topic.getValue());
+  strcpy(mqtt_device, custom_mqtt_device.getValue());
 
   Serial.println("EL MQTT SERVER: " + (String)mqtt_server);
 
@@ -174,12 +201,15 @@ void inicializarMqttClient()
   if (shouldSaveConfig) {
     Serial.println("SE CAMBIO MQTT SERVER: " + (String)mqtt_server);
     Serial.println("SE CAMBIO MQTT TOPIC: " + (String)mqtt_topic);
-    writeString(350, (String)mqtt_server);
-    writeString(400, (String)mqtt_topic);
+    Serial.println("SE CAMBIO MQTT TOPIC: " + (String)mqtt_device);
+    writeString(250, (String)mqtt_server);
+    writeString(310, (String)mqtt_topic);
+    writeString(370, (String)mqtt_device);
     EEPROM.commit();
   } else {
-    strcpy(mqtt_server, read_String(350).c_str());
-    strcpy(mqtt_topic, read_String(400).c_str());
+    strcpy(mqtt_server, read_String(250).c_str());
+    strcpy(mqtt_topic, read_String(310).c_str());
+    strcpy(mqtt_device, read_String(370).c_str());
     //    Serial.println("prueba mqtt server en eeprom: " + read_String(350));
     //    Serial.println("prueba mqtt topic en eeprom: " + read_String(400));
 
@@ -187,6 +217,7 @@ void inicializarMqttClient()
 
   Serial.println("EL MQTT SERVER: " + (String)mqtt_server);
   Serial.println("EL MQTT TOPIC: " + (String)mqtt_topic);
+  Serial.println("EL MQTT DEVICE: " + (String)mqtt_device);
 
   String generateClientId = "Esp8266Client" + generarId(10);
   strcpy(mqtt_client_id, generateClientId.c_str());
@@ -201,6 +232,10 @@ void inicializarMqttClient()
 
 void loopClientMqtt()
 {
+  
+  //Funcion para conectar a un nuevo wifi presionando el boton
+  conectarWifi();
+  
   if (!client.connected())
   {
     reconnect();
@@ -208,7 +243,15 @@ void loopClientMqtt()
   client.loop();
 }
 
-void publicarMqtt(char* topic, String mensaje)
+void publicarMqtt(String topic, String mensaje)
 {
-        client.publish(topic, String(mensaje).c_str());
+  String unido = String(mqtt_topic) + "/" + String(mqtt_device) + "/" + topic;
+  bool enviado = client.publish(String(unido).c_str(), String(mensaje).c_str());
+  String aviso  = "";
+  if (enviado) {
+    aviso = "si";
+  } else {
+    aviso = "no";
+  }
+  Serial.println("Publish: topic = " + unido + "; data = " + mensaje + "; enviado = " + aviso);
 }
