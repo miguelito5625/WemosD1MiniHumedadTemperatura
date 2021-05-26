@@ -51,7 +51,7 @@ void loopSensores()
 
   controlHumedadSuelo();
   controlHumedadAmbiente();
-  // controlTemperaturaAmbiente();
+  controlTemperaturaAmbiente();
   loopClientMqtt();
 }
 
@@ -63,30 +63,13 @@ void controlHumedadSuelo()
   humedadSuelo = analogRead(pinSensorHumedadSuelo);
   delay(3);
 
-  String mensaje = "";
-
-  if (humedadSuelo >= 1000)
-  {
-    mensaje = "sensor desconectado o fuera del suelo";
-  } else if (humedadSuelo < 1000 && humedadSuelo >= 600)
-  {
-    mensaje = "El suelo esta seco";
-  } else if (humedadSuelo < 600 && humedadSuelo >= 500)
-  {
-    mensaje = "El suelo esta humedo";
-  } else if (humedadSuelo < 500)
-  {
-    mensaje = "El sensor esta practicamente en agua";
-  }
-
-
   tiempo2HumedadSuelo = millis();
   if (tiempo2HumedadSuelo >= (tiempo1HumedadSuelo + difTiempoHumedadSuelo))
   {
     tiempo1HumedadSuelo = millis(); //Actualiza el tiempo actual
     Serial.println("");
-    // Serial.println(mensaje);
-    //Serial.println("Humedad suelo: " + (String) humedadSuelo);
+//    int porcentaje = map(humedadSuelo, 0, 1024, 100, 0);
+//    Serial.println("porcentaje humedad: " + (String) porcentaje + "%");
     publicarMqtt("HS/data", (String) humedadSuelo);
 
   }
@@ -107,12 +90,11 @@ void controlHumedadAmbiente()
 void controlTemperaturaAmbiente()
 {
 
-  tempAmbiente = 30;
-
   tiempo2TemperaturaAmbiente = millis();
   if (tiempo2TemperaturaAmbiente >= (tiempo1TemperaturaAmbiente + difTiempoTemperaturaAmbiente))
   { //Si ha pasado 2 segundo ejecuta el IF
     tiempo1TemperaturaAmbiente = millis(); //Actualiza el tiempo actual
-    publicarMqtt("proyecto/desTel/TA/data", (String)tempAmbiente);
+    tempAmbiente = dht.readTemperature();
+    publicarMqtt("TA/data", (String)tempAmbiente);
   }
 }
